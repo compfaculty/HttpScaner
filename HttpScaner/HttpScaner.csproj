@@ -3,8 +3,8 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>net7.0</TargetFramework>
-<!--        <ImplicitUsings>enable</ImplicitUsings>-->
-<!--        <Nullable>enable</Nullable>-->
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     </PropertyGroup>
 
@@ -13,8 +13,13 @@
             <Link>.dockerignore</Link>
         </Content>
     </ItemGroup>
-<!--    <PropertyGroup>-->
-<!--        <ServerGarbageCollection>true</ServerGarbageCollection>-->
-<!--    </PropertyGroup>-->
+
+    <ItemGroup>
+      <PackageReference Include="Serilog.Sinks.Console" Version="4.1.0" />
+      <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+    </ItemGroup>
+    <PropertyGroup>
+        <ServerGarbageCollection>true</ServerGarbageCollection>
+    </PropertyGroup>
 
 </Project>
